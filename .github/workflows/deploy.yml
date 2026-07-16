@@ -1,0 +1,44 @@
+name: Deploy Weekly Snapshot to GCP
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Configuración de uv para mantener al día las dependencias
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+
+    - name: Regenerate requirements.txt
+      run: uv pip compile pyproject.toml -o requirements.txt
+
+    # Autenticación en Google Cloud
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    # Configurar herramientas de GCP CLI
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    # Despliegue automático de la Cloud Function
+    - name: Deploy Cloud Function
+      run: |
+        gcloud functions deploy snapshot-semanal \
+          --gen2 \
+          --runtime=python311 \
+          --region=us-central1 \
+          --source=. \
+          --entry-point=main_http \
+          --trigger-http \
+          --no-allow-unauthenticated
